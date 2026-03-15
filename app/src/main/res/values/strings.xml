@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Focus3</string>
+    <string name="goal_placeholder">What\'s your goal?</string>
+    <string name="share">Share</string>
+    <string name="completed">Completed</string>
+    <string name="streak_days">%d day streak</string>
+    <string name="start_streak">Start your streak!</string>
+</resources>

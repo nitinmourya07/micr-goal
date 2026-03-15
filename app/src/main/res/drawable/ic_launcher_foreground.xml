@@ -1,0 +1,51 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Background circle -->
+    <path
+        android:fillColor="#00BFA5"
+        android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0"/>
+    
+    <!-- Number 3 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,35
+                         C61,35 67,40 67,47
+                         C67,51 65,54 61,56
+                         C66,58 69,62 69,68
+                         C69,76 62,82 54,82
+                         C46,82 39,76 39,68
+                         L46,68
+                         C46,72 49,75 54,75
+                         C59,75 62,72 62,68
+                         C62,64 59,61 54,61
+                         L50,61
+                         L50,55
+                         L54,55
+                         C58,55 60,52 60,48
+                         C60,44 57,41 54,41
+                         C51,41 48,44 48,48
+                         L41,48
+                         C41,40 46,35 54,35Z"/>
+    
+    <!-- Focus lines (decorative) -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M32,34 L32,28 L38,28"/>
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M76,34 L76,28 L70,28"/>
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M32,74 L32,80 L38,80"/>
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M76,74 L76,80 L70,80"/>
+</vector>
