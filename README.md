@@ -64,15 +64,21 @@ The app features a beautifully crafted dark-themed UI with glassmorphism effects
 - **Task history** tracking over time
 - **Performance insights** and trends
 
+### ☁️ Cloud Sync & Auth
+- **Google Sign-In** for seamless, secure authentication
+- **Real-time Cloud Sync** via Firebase Firestore
+- **Smart conflict resolution** between local storage and cloud backup
+- **One-tap manual sync** support alongside automatic login synchronization
+
 ### ⚙️ Additional Features
+- **Fluid 60fps transitions & predictive back gestures**
+- **Premium Celebration System** with custom haptic vibration patterns and smooth animations
 - **Onboarding tutorial** for new users
-- **Profile customization** (avatar & name)
+- **Profile customization** with cloud-synced user data
 - **Data export/import** (JSON format)
-- **Backup & restore** support
 - **Daily goal reminders** via AlarmManager
 - **Boot-persistent alarms** — reminders survive device restarts
-- **Haptic feedback** for tactile interaction
-- **Lottie animations** for premium celebrations
+- **Lottie animations** for rich visual feedback
 - **Glassmorphism UI components** for modern aesthetics
 
 ---
@@ -145,7 +151,8 @@ app/src/main/java/com/focus3/app/
 | **Language** | Kotlin 2.0.0 |
 | **UI Framework** | Jetpack Compose with Material 3 |
 | **Architecture** | MVVM + Repository Pattern |
-| **Database** | Room (SQLite) |
+| **Database** | Room (SQLite) for local, Cloud Firestore for remote |
+| **Authentication** | Firebase Auth (Google Sign-In) |
 | **Dependency Injection** | Hilt (Dagger) |
 | **Background Tasks** | WorkManager + AlarmManager |
 | **Animations** | Lottie + Compose Animations |
