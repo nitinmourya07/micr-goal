@@ -1,0 +1,77 @@
+Configuration on demand is an incubating feature.
+Warning: SDK processing. This version only understands SDK XML versions up to 3 but an SDK XML file of version 4 was encountered. This can happen if you use versions of Android Studio and the command-line tools that were released at different times.
+WARNING: We recommend using a newer Android Gradle plugin to use compileSdk = 35
+
+This Android Gradle plugin (8.2.2) was tested up to compileSdk = 34.
+
+You are strongly encouraged to update your project to use a newer
+Android Gradle plugin that has been tested with compileSdk = 35.
+
+If you are already using the latest version of the Android Gradle plugin,
+you may need to wait until a newer version with support for compileSdk = 35 is available.
+
+To suppress this warning, add/update
+    android.suppressUnsupportedCompileSdk=35
+to this project's gradle.properties.
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResValues
+> Task :app:checkDebugAarMetadata
+> Task :app:processDebugGoogleServices
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:parseDebugLocalResources
+> Task :app:extractDeepLinksDebug
+> Task :app:mergeDebugResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:mergeDebugShaders
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:javaPreCompileDebug
+> Task :app:mergeDebugAssets FROM-CACHE
+> Task :app:compressDebugAssets
+> Task :app:desugarDebugFileDependencies
+> Task :app:mergeDebugJniLibFolders FROM-CACHE
+> Task :app:checkDebugDuplicateClasses
+> Task :app:mergeDebugNativeLibs NO-SOURCE
+> Task :app:processDebugManifestForPackage
+> Task :app:mergeExtDexDebug
+> Task :app:stripDebugDebugSymbols NO-SOURCE
+> Task :app:mergeLibDexDebug
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :app:processDebugResources
+> Task :app:kspDebugKotlin
+> Task :app:compileDebugKotlin
+w: file:///D:/Final%20year%20project/micr-goal/app/src/main/java/com/focus3/app/data/repository/AuthRepository.kt:6:8 '@Deprecated(...) class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///D:/Final%20year%20project/micr-goal/app/src/main/java/com/focus3/app/data/repository/AuthRepository.kt:7:8 '@Deprecated(...) class GoogleSignInClient : GoogleApi<GoogleSignInOptions!>' is deprecated. Deprecated in Java.
+w: file:///D:/Final%20year%20project/micr-goal/app/src/main/java/com/focus3/app/data/repository/AuthRepository.kt:57:34 '@Deprecated(...) class GoogleSignInClient : GoogleApi<GoogleSignInOptions!>' is deprecated. Deprecated in Java.
+w: file:///D:/Final%20year%20project/micr-goal/app/src/main/java/com/focus3/app/data/repository/AuthRepository.kt:62:16 '@Deprecated(...) class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///D:/Final%20year%20project/micr-goal/app/src/main/java/com/focus3/app/ui/screens/LoginScreen.kt:32:8 '@Deprecated(...) class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///D:/Final%20year%20project/micr-goal/app/src/main/java/com/focus3/app/ui/screens/LoginScreen.kt:76:24 '@Deprecated(...) class GoogleSignIn : Any' is deprecated. Deprecated in Java.
+w: file:///D:/Final%20year%20project/micr-goal/app/src/main/java/com/focus3/app/ui/screens/LoginScreen.kt:285:53 '@property:Deprecated(...) val Icons.Filled.ArrowForward: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.ArrowForward.
+w: file:///D:/Final%20year%20project/micr-goal/app/src/main/java/com/focus3/app/ui/theme/Theme.kt:42:20 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/Final%20year%20project/micr-goal/app/src/main/java/com/focus3/app/ui/theme/Theme.kt:43:20 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:hiltAggregateDepsDebug
+> Task :app:hiltJavaCompileDebug
+> Task :app:processDebugJavaRes
+> Task :app:transformDebugClassesWithAsm
+> Task :app:mergeDebugJavaResource
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics
+> Task :app:mergeProjectDexDebug
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+
+BUILD SUCCESSFUL in 8m 3s
+39 actionable tasks: 37 executed, 2 from cache

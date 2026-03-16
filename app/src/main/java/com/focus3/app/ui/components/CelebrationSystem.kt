@@ -6,6 +6,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -13,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.Icon
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -297,16 +299,26 @@ fun CelebrationOverlay(
 ) {
     val context = LocalContext.current
     
-    // Haptic feedback
+    // Haptic feedback — fire only once on entry
     LaunchedEffect(isVisible) {
         if (isVisible) {
             triggerHapticFeedback(context, type)
         }
     }
     
+    // Auto-dismiss after 4 seconds
+    LaunchedEffect(isVisible) {
+        if (isVisible) {
+            delay(4000)
+            onDismiss()
+        }
+    }
+    
     AnimatedVisibility(
         visible = isVisible,
-        enter = fadeIn(tween(300)) + scaleIn(tween(300)),
+        enter = fadeIn(tween(400)) + scaleIn(
+            tween(400, easing = EaseOutBack)
+        ),
         exit = fadeOut(tween(300)) + scaleOut(tween(300))
     ) {
         Box(
@@ -335,6 +347,26 @@ fun CelebrationOverlay(
             if (type == CelebrationType.CHALLENGE_COMPLETE || type == CelebrationType.EPIC_ACHIEVEMENT) {
                 FireworksShow(isVisible = true, onComplete = {})
             }
+            
+            // Close button — top right
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(top = 16.dp, end = 16.dp)
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.15f))
+                    .clickable { onDismiss() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Close",
+                    tint = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier.size(22.dp)
+                )
+            }
         }
     }
 }
@@ -342,13 +374,46 @@ fun CelebrationOverlay(
 @Composable
 private fun DailyCompleteCelebration(streakCount: Int, onDismiss: () -> Unit) {
     val scale = remember { Animatable(0f) }
-    val rotation = remember { Animatable(0f) }
+    // Staggered element visibility
+    var showTitle by remember { mutableStateOf(false) }
+    var showSubtitle by remember { mutableStateOf(false) }
+    var showStreak by remember { mutableStateOf(false) }
+    var showQuote by remember { mutableStateOf(false) }
+    
+    // Smooth trophy pulse instead of rotation (avoids emoji rendering glitch)
+    val infiniteTransition = rememberInfiniteTransition(label = "trophy")
+    val trophyPulse by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "trophyPulse"
+    )
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.2f,
+        targetValue = 0.5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glowAlpha"
+    )
     
     LaunchedEffect(Unit) {
-        scale.animateTo(1f, tween(500, easing = OvershootInterpolator().toEasing()))
-        rotation.animateTo(360f, tween(1000))
-        delay(3000)
-        onDismiss()
+        // Phase 1: Trophy bounces in
+        scale.animateTo(1.15f, tween(400, easing = OvershootInterpolator().toEasing()))
+        scale.animateTo(1f, tween(200))
+        // Phase 2: Staggered text reveals
+        delay(200)
+        showTitle = true
+        delay(300)
+        showSubtitle = true
+        delay(300)
+        showStreak = true
+        delay(400)
+        showQuote = true
     }
     
     Column(
@@ -357,67 +422,99 @@ private fun DailyCompleteCelebration(streakCount: Int, onDismiss: () -> Unit) {
             .scale(scale.value)
             .padding(32.dp)
     ) {
-        // Trophy with glow
+        // Trophy with soft glow (no rotation, no blur on emoji)
         Box(contentAlignment = Alignment.Center) {
-            // Glow effect
-            Text(
-                "🏆",
-                fontSize = 120.sp,
+            // Glow effect behind trophy — uses a gradient Box instead of blurred emoji
+            Box(
                 modifier = Modifier
-                    .blur(20.dp)
-                    .scale(1.2f)
+                    .size(160.dp)
+                    .scale(trophyPulse * 1.1f)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFFFFD700).copy(alpha = glowAlpha),
+                                Color(0xFFFF8C00).copy(alpha = glowAlpha * 0.3f),
+                                Color.Transparent
+                            )
+                        ),
+                        shape = CircleShape
+                    )
             )
             Text(
-                "🏆",
+                "\uD83C\uDFC6",
                 fontSize = 120.sp,
-                modifier = Modifier.rotate(rotation.value)
+                modifier = Modifier.scale(trophyPulse)
             )
         }
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        Text(
-            "🔥 ALL GOALS COMPLETE! 🔥",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = Color(0xFFFFD700),
-            textAlign = TextAlign.Center
-        )
+        // Staggered title
+        AnimatedVisibility(
+            visible = showTitle,
+            enter = fadeIn(tween(400)) + scaleIn(tween(400, easing = EaseOutBack))
+        ) {
+            Text(
+                "\uD83D\uDD25 ALL GOALS COMPLETE! \uD83D\uDD25",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color(0xFFFFD700),
+                textAlign = TextAlign.Center
+            )
+        }
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        Text(
-            "You're on FIRE! 💪",
-            fontSize = 20.sp,
-            color = Color.White,
-            textAlign = TextAlign.Center
-        )
+        // Staggered subtitle
+        AnimatedVisibility(
+            visible = showSubtitle,
+            enter = fadeIn(tween(300)) + slideInVertically { it / 2 }
+        ) {
+            Text(
+                "You're on FIRE! \uD83D\uDCAA",
+                fontSize = 20.sp,
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
+        }
         
+        // Staggered streak badge
         if (streakCount > 0) {
             Spacer(modifier = Modifier.height(12.dp))
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Color(0xFFFF6B35).copy(alpha = 0.3f)
+            AnimatedVisibility(
+                visible = showStreak,
+                enter = fadeIn(tween(300)) + scaleIn(tween(300, easing = EaseOutBack))
             ) {
-                Text(
-                    "🔥 $streakCount Day Streak! 🔥",
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFFF6B35)
-                )
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color(0xFFFF6B35).copy(alpha = 0.3f)
+                ) {
+                    Text(
+                        "\uD83D\uDD25 $streakCount Day Streak! \uD83D\uDD25",
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFF6B35)
+                    )
+                }
             }
         }
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        Text(
-            motivationalQuotes.random(),
-            fontSize = 14.sp,
-            color = Color.White.copy(alpha = 0.7f),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
+        // Staggered motivational quote
+        AnimatedVisibility(
+            visible = showQuote,
+            enter = fadeIn(tween(400))
+        ) {
+            Text(
+                motivationalQuotes.random(),
+                fontSize = 14.sp,
+                color = Color.White.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
     }
 }
 
@@ -887,11 +984,11 @@ private fun triggerHapticFeedback(context: android.content.Context, type: Celebr
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val pattern = when (type) {
-                CelebrationType.DAILY_COMPLETE -> longArrayOf(0, 100, 50, 100, 50, 200)
-                CelebrationType.CHALLENGE_PROGRESS -> longArrayOf(0, 50, 50, 50)
-                CelebrationType.CHALLENGE_COMPLETE -> longArrayOf(0, 100, 50, 100, 50, 100, 50, 300)
-                CelebrationType.STREAK_MILESTONE -> longArrayOf(0, 100, 50, 100, 50, 200)
-                CelebrationType.EPIC_ACHIEVEMENT -> longArrayOf(0, 100, 50, 100, 50, 100, 50, 100, 50, 400)
+                CelebrationType.DAILY_COMPLETE -> longArrayOf(0, 80, 120, 120, 120, 250)
+                CelebrationType.CHALLENGE_PROGRESS -> longArrayOf(0, 60)
+                CelebrationType.CHALLENGE_COMPLETE -> longArrayOf(0, 80, 150, 80, 150, 300)
+                CelebrationType.STREAK_MILESTONE -> longArrayOf(0, 80, 120, 120, 120, 250)
+                CelebrationType.EPIC_ACHIEVEMENT -> longArrayOf(0, 80, 150, 80, 150, 80, 150, 400)
             }
             vibrator.vibrate(VibrationEffect.createWaveform(pattern, -1))
         } else {

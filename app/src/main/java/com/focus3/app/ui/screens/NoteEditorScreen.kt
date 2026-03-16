@@ -372,7 +372,7 @@ fun NoteEditorScreen(
                     Box {
                         if (title.isEmpty()) {
                             Text(
-                                "MISSION TITLE",
+                                "Mission title...",
                                 style = MaterialTheme.typography.headlineMedium.copy(
                                     fontWeight = FontWeight.Black,
                                     letterSpacing = (-0.5).sp
@@ -385,7 +385,16 @@ fun NoteEditorScreen(
                 }
             )
             
-            Spacer(modifier = Modifier.height(24.dp))
+            // Teal divider
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .height(1.dp)
+                    .background(PrimaryTeal.copy(alpha = 0.3f))
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
             
             // Content Input
             BasicTextField(
@@ -404,7 +413,7 @@ fun NoteEditorScreen(
                     Box {
                         if (content.isEmpty()) {
                             Text(
-                                "Start writing your thoughts...",
+                                "Begin mission log...",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = Color.White.copy(alpha = 0.3f)
                             )
@@ -583,7 +592,6 @@ fun NoteEditorScreen(
             Spacer(modifier = Modifier.height(20.dp))
         }
     }
-    
     // Bottom Toolbar (Google Notes style) - Using floating Box
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -594,35 +602,71 @@ fun NoteEditorScreen(
                 .fillMaxWidth()
                 .background(noteColor.copy(alpha = 0.95f))
                 .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = 8.dp, vertical = 8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { 
-                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                    showChecklist = !showChecklist 
-                }) {
-                    Icon(Icons.Default.CheckBox, contentDescription = "Checklist", tint = if (showChecklist) PrimaryTeal else Color.White.copy(alpha = 0.7f))
+                Row {
+                    IconButton(onClick = { 
+                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                        showChecklist = !showChecklist 
+                    }) {
+                        Icon(Icons.Default.CheckBox, contentDescription = "Checklist", tint = if (showChecklist) PrimaryTeal else Color.White.copy(alpha = 0.7f))
+                    }
+                    IconButton(onClick = { 
+                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                        isPinned = !isPinned 
+                    }) {
+                        Icon(
+                            Icons.Default.PushPin,
+                            contentDescription = "Pin",
+                            tint = if (isPinned) PrimaryTeal else Color.White.copy(alpha = 0.7f)
+                        )
+                    }
+                    IconButton(onClick = { 
+                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                        showLabelPicker = true 
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.Label, contentDescription = "Labels", tint = if (selectedLabels.isNotEmpty()) PrimaryTeal else Color.White.copy(alpha = 0.7f))
+                    }
                 }
-                IconButton(onClick = { 
-                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                    showLabelPicker = true 
-                }) {
-                    Icon(Icons.AutoMirrored.Filled.Label, contentDescription = "Labels", tint = if (selectedLabels.isNotEmpty()) PrimaryTeal else Color.White.copy(alpha = 0.7f))
-                }
-                IconButton(onClick = { 
-                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                    showColorPicker = true 
-                }) {
-                    Icon(Icons.Default.Palette, contentDescription = "Color", tint = Color.White.copy(alpha = 0.7f))
-                }
-                IconButton(onClick = { 
-                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                    showEmojiPicker = true 
-                }) {
-                    Icon(Icons.Default.EmojiEmotions, contentDescription = "Emoji", tint = Color.White.copy(alpha = 0.7f))
+                // Word count + timestamp
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        "$wordCount words",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.5f)
+                    )
+                    if (!isNewNote && note != null) {
+                        val modifiedDisplay = remember(note.updatedAt) {
+                            try {
+                                val dateTime = java.time.LocalDateTime.parse(note.updatedAt)
+                                val now = java.time.LocalDateTime.now()
+                                val hours = java.time.temporal.ChronoUnit.HOURS.between(dateTime, now)
+                                when {
+                                    hours < 1 -> "Modified just now"
+                                    hours < 24 -> "Modified ${hours}h ago"
+                                    else -> {
+                                        val days = java.time.temporal.ChronoUnit.DAYS.between(dateTime.toLocalDate(), now.toLocalDate())
+                                        "Modified ${days}d ago"
+                                    }
+                                }
+                            } catch (e: Exception) { "" }
+                        }
+                        if (modifiedDisplay.isNotEmpty()) {
+                            Text(
+                                modifiedDisplay,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.4f)
+                            )
+                        }
+                    }
                 }
             }
         }

@@ -1,10 +1,12 @@
-﻿package com.focus3.app.ui.viewmodel
+package com.focus3.app.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.focus3.app.data.model.CalendarNote
 import com.focus3.app.data.model.DailyTask
 import com.focus3.app.data.model.StreakData
+import com.focus3.app.data.repository.AuthRepository
+import com.focus3.app.data.repository.FirestoreRepository
 import com.focus3.app.data.repository.TaskRepository
 import com.focus3.app.ui.screens.CustomMilestone
 import com.focus3.app.BuildConfig
@@ -105,8 +107,50 @@ internal data class CombinedGroup3(
 class MainViewModel @Inject constructor(
     private val taskRepository: TaskRepository,
     private val calendarNoteDao: CalendarNoteDao,
+    private val authRepository: AuthRepository,
+    private val firestoreRepository: FirestoreRepository,
     @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context
 ) : ViewModel() {
+
+    // ==================== AUTH & SYNC STATE ====================
+    val isLoggedIn: StateFlow<Boolean> = authRepository.currentUser
+        .let { userFlow ->
+            kotlinx.coroutines.flow.MutableStateFlow(authRepository.isLoggedIn()).also { state ->
+                viewModelScope.launch {
+                    userFlow.collect { user -> state.value = user != null }
+                }
+            }
+        }
+    
+    val currentUserName: StateFlow<String?> = authRepository.currentUser
+        .let { userFlow ->
+            kotlinx.coroutines.flow.MutableStateFlow(authRepository.currentUser.value?.displayName).also { state ->
+                viewModelScope.launch {
+                    userFlow.collect { user -> state.value = user?.displayName }
+                }
+            }
+        }
+    
+    val currentUserEmail: StateFlow<String?> = authRepository.currentUser
+        .let { userFlow ->
+            kotlinx.coroutines.flow.MutableStateFlow(authRepository.currentUser.value?.email).also { state ->
+                viewModelScope.launch {
+                    userFlow.collect { user -> state.value = user?.email }
+                }
+            }
+        }
+    
+    val currentUserPhotoUrl: StateFlow<String?> = authRepository.currentUser
+        .let { userFlow ->
+            kotlinx.coroutines.flow.MutableStateFlow(authRepository.currentUser.value?.photoUrl?.toString()).also { state ->
+                viewModelScope.launch {
+                    userFlow.collect { user -> state.value = user?.photoUrl?.toString() }
+                }
+            }
+        }
+    
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
     
     // SharedPreferences for notification settings - MUST match alarm scheduler!
     private val prefs = appContext.getSharedPreferences("focus3_preferences", android.content.Context.MODE_PRIVATE)
@@ -151,10 +195,15 @@ class MainViewModel @Inject constructor(
         // Refresh quote on app open (ViewModel creation)
         _permanentQuote.value = QuotesData.getHomeQuote()
         
-        // Initialize today's tasks
+        // Initialize today's tasks FIRST (local only — safe, checks isEmpty)
         viewModelScope.launch {
             taskRepository.initializeTodayTasks()
             taskRepository.checkAndUpdateStreak()
+            
+            // Cloud sync AFTER local init — pullTasks skips today if local tasks exist
+            if (authRepository.isLoggedIn()) {
+                syncFromCloud()
+            }
         }
         
         // Ensure daily reminder is scheduled on app start
@@ -320,6 +369,17 @@ class MainViewModel @Inject constructor(
             )
             taskRepository.insertChallenge(challenge)
             
+            // Push to Firestore immediately
+            val uid = authRepository.getCurrentUid()
+            if (uid != null) {
+                // Get the newly inserted challenge (latest with matching name)
+                val challenges = taskRepository.getAllChallenges().first()
+                val newChallenge = challenges.find { it.name == name }
+                newChallenge?.let {
+                    firestoreRepository.pushSingleChallenge(uid, it)
+                }
+            }
+            
             // Schedule reminder if time is set
             reminderTime?.let { time ->
                 val parsed = com.focus3.app.notification.ChallengeAlarmScheduler.parseTimeString(time)
@@ -349,6 +409,12 @@ class MainViewModel @Inject constructor(
                 taskRepository.deleteChallenge(it)
                 // Cancel any scheduled reminder
                 com.focus3.app.notification.ChallengeAlarmScheduler.cancelReminder(appContext, challengeId)
+                
+                // Delete from Firestore too
+                val uid = authRepository.getCurrentUid()
+                if (uid != null) {
+                    firestoreRepository.deleteSingleChallenge(uid, challengeId)
+                }
             }
             // Navigate back after deletion
             _currentView.value = AppView.CHALLENGES
@@ -401,14 +467,11 @@ class MainViewModel @Inject constructor(
                     _showConfetti.value = true
                 }
                 
-                // Check for streak milestones
+                // Check for streak milestones — queue handles ordering
                 val newStreak = challengeAfter?.currentStreak ?: 0
                 val milestones = listOf(7, 14, 21, 30, 50, 75, 100, 365)
                 if (newStreak in milestones) {
-                    viewModelScope.launch {
-                        delay(3000) // Wait for current celebration
-                        triggerStreakMilestoneCelebration(newStreak)
-                    }
+                    triggerStreakMilestoneCelebration(newStreak)
                 }
             }
         }
@@ -538,34 +601,52 @@ class MainViewModel @Inject constructor(
         }
     }
     
-    // ==================== CELEBRATION SYSTEM ====================
+    // ==================== CELEBRATION SYSTEM (QUEUED) ====================
+    
+    // Queue to prevent stacking — data class holds type + optional data
+    private data class CelebrationItem(val type: String, val data: String = "")
+    private val _celebrationQueue = mutableListOf<CelebrationItem>()
+    
+    private fun enqueueOrShowCelebration(type: String, data: String = "") {
+        if (_showCelebration.value) {
+            // Already showing one — enqueue
+            _celebrationQueue.add(CelebrationItem(type, data))
+        } else {
+            // Show immediately
+            _celebrationType.value = type
+            _celebrationChallengeName.value = data
+            _showCelebration.value = true
+        }
+    }
     
     fun triggerDailyCompleteCelebration() {
-        _celebrationType.value = "DAILY_COMPLETE"
-        _celebrationChallengeName.value = ""
-        _showCelebration.value = true
+        enqueueOrShowCelebration("DAILY_COMPLETE")
     }
     
     fun triggerChallengeProgressCelebration() {
-        _celebrationType.value = "CHALLENGE_PROGRESS"
-        _celebrationChallengeName.value = ""
-        _showCelebration.value = true
+        enqueueOrShowCelebration("CHALLENGE_PROGRESS")
     }
     
     fun triggerChallengeCompleteCelebration(challengeName: String) {
-        _celebrationType.value = "CHALLENGE_COMPLETE"
-        _celebrationChallengeName.value = challengeName
-        _showCelebration.value = true
+        enqueueOrShowCelebration("CHALLENGE_COMPLETE", challengeName)
     }
     
     fun triggerStreakMilestoneCelebration(days: Int) {
-        _celebrationType.value = "STREAK_MILESTONE"
-        _celebrationChallengeName.value = days.toString()
-        _showCelebration.value = true
+        enqueueOrShowCelebration("STREAK_MILESTONE", days.toString())
     }
     
     fun dismissCelebration() {
         _showCelebration.value = false
+        // Show next queued celebration after a short delay
+        if (_celebrationQueue.isNotEmpty()) {
+            val next = _celebrationQueue.removeAt(0)
+            viewModelScope.launch {
+                delay(500) // Brief pause between celebrations
+                _celebrationType.value = next.type
+                _celebrationChallengeName.value = next.data
+                _showCelebration.value = true
+            }
+        }
     }
     
     fun dismissConfetti() {
@@ -703,133 +784,64 @@ class MainViewModel @Inject constructor(
             }
         }
     }
-    // Import Data from JSON backup
+    // Import Data from JSON backup — delegated to DataImportHelper
     fun importDataFromUri(context: android.content.Context, uri: android.net.Uri) {
         viewModelScope.launch {
+            val helper = com.focus3.app.data.util.DataImportHelper(taskRepository, calendarNoteDao)
+            helper.importFromUri(context, uri)
+        }
+    }
+
+
+    // ==================== CLOUD SYNC ====================
+    
+    /**
+     * Push all local data to Firestore.
+     */
+    fun syncToCloud() {
+        val uid = authRepository.getCurrentUid() ?: return
+        viewModelScope.launch {
+            _isSyncing.value = true
             try {
-                val jsonString = context.contentResolver.openInputStream(uri)?.use { stream ->
-                    stream.bufferedReader().readText()
-                } ?: return@launch
-
-                // Parse JSON and import data
-                val jsonObject = org.json.JSONObject(jsonString)
-
-                fun org.json.JSONObject.optIntCompat(vararg keys: String, default: Int = 0): Int {
-                    for (key in keys) {
-                        if (has(key)) return optInt(key, default)
-                    }
-                    return default
-                }
-
-                fun org.json.JSONObject.optBooleanCompat(vararg keys: String, default: Boolean = false): Boolean {
-                    for (key in keys) {
-                        if (has(key)) return optBoolean(key, default)
-                    }
-                    return default
-                }
-
-                fun org.json.JSONObject.optStringCompat(vararg keys: String, default: String = ""): String {
-                    for (key in keys) {
-                        if (!has(key)) continue
-                        val value = optString(key, "")
-                        if (value.isNotBlank() && value.lowercase(Locale.US) != "null") {
-                            return value
-                        }
-                    }
-                    return default
-                }
-
-                fun org.json.JSONObject.optNullableStringCompat(vararg keys: String): String? {
-                    val value = optStringCompat(*keys, default = "")
-                    return value.ifBlank { null }
-                }
-
-                // Import tasks if present
-                if (jsonObject.has("tasks")) {
-                    val tasksArray = jsonObject.getJSONArray("tasks")
-                    for (i in 0 until tasksArray.length()) {
-                        val taskObj = tasksArray.getJSONObject(i)
-                        val rawTaskIndex = taskObj.optIntCompat("task_index", "taskIndex", "taskNumber", default = i)
-                        val taskIndex = if (
-                            taskObj.has("taskNumber")
-                            && !taskObj.has("task_index")
-                            && !taskObj.has("taskIndex")
-                        ) {
-                            (rawTaskIndex - 1).coerceAtLeast(0)
-                        } else {
-                            rawTaskIndex.coerceAtLeast(0)
-                        }
-
-                        val task = DailyTask(
-                            id = 0, // Let Room auto-generate
-                            date = taskObj.optStringCompat("date", default = LocalDate.now().toString()),
-                            taskIndex = taskIndex,
-                            content = taskObj.optStringCompat("content"),
-                            isCompleted = taskObj.optBooleanCompat("is_completed", "isCompleted", default = false)
-                        )
-
-                        if (task.content.isNotBlank()) {
-                            taskRepository.insertTask(task)
-                        }
-                    }
-                }
-
-                // Import challenges if present
-                if (jsonObject.has("challenges")) {
-                    val challengesArray = jsonObject.getJSONArray("challenges")
-                    for (i in 0 until challengesArray.length()) {
-                        val challengeObj = challengesArray.getJSONObject(i)
-                        val completedDays = challengeObj.optIntCompat("completed_days", "completedDays", "currentProgress", default = 0)
-                        val currentStreak = when {
-                            challengeObj.has("current_streak") -> challengeObj.optInt("current_streak", 0)
-                            challengeObj.has("currentStreak") -> challengeObj.optInt("currentStreak", 0)
-                            challengeObj.has("currentProgress") -> completedDays
-                            else -> 0
-                        }
-
-                        val challenge = Challenge(
-                            id = 0, // Let Room auto-generate
-                            name = challengeObj.optStringCompat("name"),
-                            targetDays = challengeObj.optIntCompat("target_days", "targetDays", default = 30),
-                            icon = challengeObj.optStringCompat("icon", default = "\uD83C\uDFAF"),
-                            startDate = challengeObj.optStringCompat("start_date", "startDate", default = LocalDate.now().toString()),
-                            completedDays = completedDays,
-                            currentStreak = currentStreak,
-                            lastCompletedDate = challengeObj.optStringCompat("last_completed_date", "lastCompletedDate"),
-                            reminderTime = challengeObj.optNullableStringCompat("reminder_time", "reminderTime"),
-                            graceDaysUsed = challengeObj.optIntCompat("grace_days_used", "graceDaysUsed", default = 0)
-                        )
-
-                        if (challenge.name.isNotBlank()) {
-                            taskRepository.insertChallenge(challenge)
-                        }
-                    }
-                }
-
-                // Import streak if present
-                if (jsonObject.has("streak")) {
-                    val streakObj = jsonObject.getJSONObject("streak")
-                    val lastCompletedDate = streakObj.optStringCompat(
-                        "last_completed_date",
-                        "lastCompletedDate",
-                        "lastCompletionDate"
-                    )
-
-                    val streakData = StreakData(
-                        currentStreak = streakObj.optIntCompat("current_streak", "currentStreak", default = 0),
-                        longestStreak = streakObj.optIntCompat("longest_streak", "longestStreak", default = 0),
-                        totalCompletedDays = streakObj.optIntCompat("total_completed_days", "totalCompletedDays", default = 0),
-                        lastCompletedDate = lastCompletedDate,
-                        graceDaysUsed = streakObj.optIntCompat("grace_days_used", "graceDaysUsed", default = 0),
-                        lastCheckedDate = streakObj.optStringCompat("last_checked_date", "lastCheckedDate", default = lastCompletedDate)
-                    )
-                    taskRepository.saveStreakData(streakData)
-                }
-
+                firestoreRepository.pushAllData(uid)
             } catch (e: Exception) {
-                // Handle error silently - could add error feedback here
-                android.util.Log.e("MainViewModel", "Error importing data: ${e.message}")
+                android.util.Log.e("MainViewModel", "Sync to cloud failed: ${e.message}")
+            } finally {
+                _isSyncing.value = false
             }
+        }
+    }
+    
+    /**
+     * Pull all data from Firestore into Room.
+     */
+    fun syncFromCloud() {
+        val uid = authRepository.getCurrentUid() ?: return
+        viewModelScope.launch {
+            _isSyncing.value = true
+            try {
+                firestoreRepository.syncOnLogin(uid)
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Sync from cloud failed: ${e.message}")
+            } finally {
+                _isSyncing.value = false
+            }
+        }
+    }
+    
+    /**
+     * Sign out the current user.
+     */
+    fun signOut() {
+        viewModelScope.launch {
+            // Push data before signing out
+            val uid = authRepository.getCurrentUid()
+            if (uid != null) {
+                try {
+                    firestoreRepository.pushAllData(uid)
+                } catch (_: Exception) { }
+            }
+            authRepository.signOut()
         }
     }
 }

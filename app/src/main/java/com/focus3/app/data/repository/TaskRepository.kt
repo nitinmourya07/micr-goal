@@ -175,10 +175,13 @@ class TaskRepository @Inject constructor(
         if (completedCount < 3 && currentStreakData.lastCompletedDate == today) {
             // Revert today's streak increment
             val revertedStreak = (currentStreakData.currentStreak - 1).coerceAtLeast(0)
+            // Recalculate longestStreak: it may have been inflated by today's now-reverted streak
+            val correctedLongest = maxOf(currentStreakData.longestStreak, revertedStreak)
             
             taskDao.insertOrUpdateStreak(
                 currentStreakData.copy(
                     currentStreak = revertedStreak,
+                    longestStreak = correctedLongest,
                     totalCompletedDays = (currentStreakData.totalCompletedDays - 1).coerceAtLeast(0),
                     lastCompletedDate = "", // Clear so it can be re-earned
                     lastCheckedDate = today // Still checked today

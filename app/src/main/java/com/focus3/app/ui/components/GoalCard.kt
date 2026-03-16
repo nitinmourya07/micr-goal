@@ -93,10 +93,42 @@ fun GoalCard(
             )
         ) + fadeIn(tween(100))
     ) {
+        // Completion scale pop — card pops briefly when checked
+        val completionScale by animateFloatAsState(
+            targetValue = if (task.isCompleted && task.content.isNotBlank()) 1.0f else 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            ),
+            label = "completion_pop"
+        )
+        
+        // Track previous completion state for pop effect
+        var justCompleted by remember { mutableStateOf(false) }
+        LaunchedEffect(task.isCompleted) {
+            if (task.isCompleted && task.content.isNotBlank()) {
+                justCompleted = true
+                delay(300)
+                justCompleted = false
+            }
+        }
+        val popScale by animateFloatAsState(
+            targetValue = if (justCompleted) 1.04f else 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioLowBouncy,
+                stiffness = Spring.StiffnessHigh
+            ),
+            label = "pop_scale"
+        )
+        
         GlassBox(
             modifier = modifier
                 .fillMaxWidth()
-                .padding(bottom = 14.dp),
+                .padding(bottom = 14.dp)
+                .graphicsLayer {
+                    scaleX = popScale
+                    scaleY = popScale
+                },
             cornerRadius = 24.dp,
             showGlow = task.isCompleted && task.content.isNotBlank(),
             glowColor = CompletedGreen

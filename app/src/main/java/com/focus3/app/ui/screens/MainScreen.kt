@@ -1,4 +1,4 @@
-﻿package com.focus3.app.ui.screens
+package com.focus3.app.ui.screens
 
 import android.app.Activity
 import androidx.activity.compose.BackHandler
@@ -53,12 +53,14 @@ import java.time.LocalTime
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     viewModel: MainViewModel = hiltViewModel(),
-    initialNavigateTo: String? = null
+    initialNavigateTo: String? = null,
+    onNavigateToLogin: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -172,6 +174,9 @@ fun MainScreen(
                             onNavigateToProfile = { viewModel.navigateTo(AppView.PROFILE) },
                             onNavigateToChallenges = { viewModel.navigateTo(AppView.CHALLENGES) },
                             onNavigateToSettings = { viewModel.navigateTo(AppView.SETTINGS) },
+                            onNavigateToLogin = onNavigateToLogin,
+                            onSignOut = { viewModel.signOut() },
+                            viewModel = viewModel,
                             onShare = {
                                 ShareUtils.shareCompletedTasks(
                                     context = context,
@@ -218,11 +223,18 @@ fun MainScreen(
                         )
                     }
                     AppView.PROFILE -> {
+                        val googleUserName by viewModel.currentUserName.collectAsState()
+                        val googleUserEmail by viewModel.currentUserEmail.collectAsState()
+                        val googlePhotoUrl by viewModel.currentUserPhotoUrl.collectAsState()
+                        
                         ProfileScreen(
                             currentAvatar = uiState.userAvatar,
                             userName = uiState.userName,
                             streak = uiState.streak,
                             totalGoalsCompleted = uiState.completionHistory.values.sum(),
+                            googlePhotoUrl = googlePhotoUrl,
+                            googleDisplayName = googleUserName,
+                            googleEmail = googleUserEmail,
                             onAvatarChange = { viewModel.saveUserAvatar(it) },
                             onNameChange = { viewModel.saveUserName(it) },
                             onBack = { viewModel.navigateTo(AppView.HOME) }
@@ -364,7 +376,8 @@ fun MainScreen(
             ConfettiOverlay(
                 isVisible = true,
                 message = uiState.confettiMessage,
-                onDismiss = { viewModel.dismissConfetti() }
+                onDismiss = { viewModel.dismissConfetti() },
+                isCelebrationShowing = uiState.showCelebration
             )
         }
 
@@ -489,6 +502,7 @@ fun QuoteOverlay(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     uiState: MainUiState,
@@ -499,8 +513,15 @@ fun HomeScreen(
     onNavigateToProfile: () -> Unit,
     onNavigateToChallenges: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToLogin: () -> Unit,
+    onSignOut: () -> Unit,
+    viewModel: MainViewModel,
     onShare: () -> Unit
 ) {
+    val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle()
+    val userName by viewModel.currentUserName.collectAsStateWithLifecycle()
+    val userEmail by viewModel.currentUserEmail.collectAsStateWithLifecycle()
+    var showProfileMenu by remember { mutableStateOf(false) }
     val hour = remember { LocalTime.now().hour }
     
     // Dynamic greeting with personality
@@ -571,9 +592,10 @@ fun HomeScreen(
                 progress = uiState.completionProgress,
                 streak = uiState.streak,
                 avatar = uiState.userAvatar,
+                userName = uiState.userName,
                 onAnalyticsClick = onNavigateToAnalytics,
                 onStreakClick = onNavigateToStreakJourney,
-                onProfileClick = onNavigateToProfile,
+                onProfileClick = { showProfileMenu = true },
                 onChallengesClick = onNavigateToChallenges,
                 onSettingsClick = onNavigateToSettings
             )
@@ -923,6 +945,91 @@ fun HomeScreen(
         
         item { Spacer(modifier = Modifier.height(40.dp)) }
     }
+    
+    // Profile Bottom Sheet Menu
+    if (showProfileMenu) {
+        ModalBottomSheet(
+            onDismissRequest = { showProfileMenu = false },
+            containerColor = Color(0xFF12121A),
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        ) {
+            if (isLoggedIn) {
+                // Show user info + actions
+                Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 32.dp)) {
+                    Text(
+                        text = userName ?: "Operative",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = Color.White
+                    )
+                    Text(
+                        text = userEmail ?: "",
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // View Profile option
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                showProfileMenu = false
+                                onNavigateToProfile()
+                            }
+                            .padding(vertical = 12.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = Color.White)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("View Profile", color = Color.White)
+                    }
+                    
+                    // Sign Out option
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                showProfileMenu = false
+                                onSignOut()
+                            }
+                            .padding(vertical = 12.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.ExitToApp,
+                            contentDescription = null,
+                            tint = Color.Red
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("Sign Out", color = Color.Red)
+                    }
+                }
+            } else {
+                // Not logged in — show only sign in
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable {
+                            showProfileMenu = false
+                            onNavigateToLogin()
+                        }
+                        .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Login, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text("Sign In with Google", color = Color.White)
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -932,6 +1039,7 @@ fun EnhancedHeaderSection(
     progress: Float,
     streak: Int,
     avatar: String,
+    userName: String = "Focus Champion",
     onAnalyticsClick: () -> Unit,
     onStreakClick: () -> Unit,
     onProfileClick: () -> Unit,
@@ -964,19 +1072,30 @@ fun EnhancedHeaderSection(
                 )
             }
             
-            // Premium Avatar with Glass border
+            // Premium Avatar — Google initials with gradient
+            val firebaseUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+            val displayName = firebaseUser?.displayName ?: userName
+            val initials = displayName.take(1).uppercase()
+            
             Box(
                 modifier = Modifier
                     .size(56.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.05f))
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(PrimaryTeal, NeonCyan)
+                        ),
+                        CircleShape
+                    )
                     .border(1.2.dp, GlassBorder, CircleShape)
                     .clickable(onClick = onProfileClick),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    avatar,
-                    fontSize = 28.sp
+                    initials,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.Black
                 )
             }
         }
@@ -1415,18 +1534,16 @@ fun PremiumBottomNavigation(
                             )
                         }
 
-                        // Active dot indicator below label for unselected items
-                        if (!isSelected) {
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Box(
-                                modifier = Modifier
-                                    .size(3.dp)
-                                    .background(
-                                        Color.White.copy(alpha = 0.15f),
-                                        CircleShape
-                                    )
-                            )
-                        }
+                        // Active teal dot indicator below selected, subtle dot for unselected
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(if (isSelected) 5.dp else 3.dp)
+                                .background(
+                                    if (isSelected) PrimaryTeal else Color.White.copy(alpha = 0.15f),
+                                    CircleShape
+                                )
+                        )
                     }
                 }
             }

@@ -5,14 +5,27 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.focus3.app.BuildConfig
+import com.focus3.app.data.dao.ChallengeDao
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Reschedules alarms after device reboot
+ * Reschedules alarms after device reboot.
+ * Uses Hilt @EntryPoint to access the singleton ChallengeDao
+ * instead of creating a second Room database instance.
  */
 class BootReceiver : BroadcastReceiver() {
+
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface BootReceiverEntryPoint {
+        fun challengeDao(): ChallengeDao
+    }
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
@@ -41,17 +54,13 @@ class BootReceiver : BroadcastReceiver() {
 
     private fun rescheduleChallenges(context: Context) {
         CoroutineScope(Dispatchers.IO).launch {
-            var database: com.focus3.app.data.database.Focus3Database? = null
             try {
-                database = androidx.room.Room.databaseBuilder(
+                val entryPoint = EntryPointAccessors.fromApplication(
                     context.applicationContext,
-                    com.focus3.app.data.database.Focus3Database::class.java,
-                    "focus3_database"
+                    BootReceiverEntryPoint::class.java
                 )
-                .fallbackToDestructiveMigrationFrom(1, 2, 3, 4, 5, 6, 7, 8)
-                .build()
-                
-                val challenges = database.challengeDao().getAllChallengesSync()
+                val challengeDao = entryPoint.challengeDao()
+                val challenges = challengeDao.getAllChallengesSync()
                 var count = 0
                 
                 challenges.forEach { challenge ->
@@ -74,10 +83,8 @@ class BootReceiver : BroadcastReceiver() {
                 
             } catch (e: Exception) {
                 Log.e("BootReceiver", "Error rescheduling challenges: ${e.message}")
-            } finally {
-                // Always close the database to prevent resource leaks
-                try { database?.close() } catch (_: Exception) {}
             }
         }
     }
 }
+

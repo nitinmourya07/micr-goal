@@ -19,6 +19,9 @@ interface ChallengeDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertChallenge(challenge: Challenge)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(challenges: List<Challenge>)
+
     @Update
     suspend fun updateChallenge(challenge: Challenge)
 

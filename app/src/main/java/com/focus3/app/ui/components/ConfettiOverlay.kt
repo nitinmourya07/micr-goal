@@ -1,12 +1,15 @@
-﻿package com.focus3.app.ui.components
+package com.focus3.app.ui.components
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -31,43 +34,47 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * ðŸŽ‰ NEXT-LEVEL Non-blocking Confetti Toast
- * Premium glass-morphic toast with glow effects + confetti
+ * Premium Non-blocking Confetti Toast
+ * Glass-morphic toast with glow effects + confetti
+ * BUG FIXES: emoji corruption, broken layout, popup positioning
  */
 @Composable
 fun ConfettiOverlay(
     isVisible: Boolean,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    message: String = "\uD83C\uDF89 Goal Complete!"
+    message: String = "\uD83C\uDF89 Goal Complete!",
+    isCelebrationShowing: Boolean = false // Suppress if full celebration is active
 ) {
+    // Don't show small popup if the full celebration overlay is active
+    if (isCelebrationShowing) return
+
     val composition by rememberLottieComposition(
         LottieCompositionSpec.RawRes(R.raw.confetti)
     )
-    
+
     val progress by animateLottieCompositionAsState(
         composition = composition,
         isPlaying = isVisible,
         restartOnPlay = true
     )
-    
-    // Toast animations
-    val toastOffset = remember { Animatable(150f) }
-    val toastScale = remember { Animatable(0.8f) }
-    val glowAlpha = remember { Animatable(0f) }
-    
+
+    // Toast slide-in animation
+    val toastOffset = remember { Animatable(100f) }
+    val toastAlpha = remember { Animatable(0f) }
+
     // Pulsing glow effect
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.05f,
+        targetValue = 1.03f,
         animationSpec = infiniteRepeatable(
             animation = tween(600, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulseScale"
     )
-    
+
     val glowPulse by infiniteTransition.animateFloat(
         initialValue = 0.4f,
         targetValue = 0.8f,
@@ -77,44 +84,39 @@ fun ConfettiOverlay(
         ),
         label = "glowPulse"
     )
-    
+
     LaunchedEffect(isVisible) {
         if (isVisible) {
-            // Entrance animation sequence - run in parallel
-            launch {
-                glowAlpha.animateTo(1f, tween(300))
-            }
-            launch {
-                toastScale.animateTo(
-                    1f,
-                    spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMedium
-                    )
-                )
-            }
+            // Entrance animation
+            launch { toastAlpha.animateTo(1f, tween(300)) }
             toastOffset.animateTo(
                 0f,
                 spring(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow
+                    stiffness = Spring.StiffnessMedium
                 )
             )
         }
     }
-    
-    // Auto-dismiss after animation completes
-    LaunchedEffect(progress) {
-        if (progress >= 0.95f && isVisible) {
-            delay(300)
+
+    // Auto-dismiss after 2.5 seconds
+    LaunchedEffect(isVisible) {
+        if (isVisible) {
+            delay(2500)
             onDismiss()
         }
     }
-    
+
     AnimatedVisibility(
         visible = isVisible,
-        enter = fadeIn(tween(200)),
-        exit = fadeOut(tween(300))
+        enter = slideInVertically(
+            initialOffsetY = { it },
+            animationSpec = tween(300)
+        ) + fadeIn(tween(300)),
+        exit = slideOutVertically(
+            targetOffsetY = { it },
+            animationSpec = tween(250)
+        ) + fadeOut(tween(250))
     ) {
         Box(
             modifier = modifier.fillMaxSize()
@@ -125,115 +127,91 @@ fun ConfettiOverlay(
                 progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.6f)
+                    .fillMaxHeight(0.5f)
                     .align(Alignment.TopCenter)
             )
-            
-            // PREMIUM TOAST - Glass morphic with glow
+
+            // FIXED POPUP — positioned ABOVE bottom nav with proper padding
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 120.dp)
+                    .padding(bottom = 90.dp) // Clear the bottom navigation bar
                     .offset(y = toastOffset.value.dp)
                     .graphicsLayer {
-                        scaleX = toastScale.value * pulseScale
-                        scaleY = toastScale.value * pulseScale
+                        alpha = toastAlpha.value
+                        scaleX = pulseScale
+                        scaleY = pulseScale
                     }
             ) {
                 // Outer glow effect
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .blur(20.dp)
+                        .blur(15.dp)
                         .background(
                             brush = Brush.radialGradient(
                                 colors = listOf(
-                                    PrimaryTeal.copy(alpha = glowPulse * glowAlpha.value),
-                                    NeonCyan.copy(alpha = glowPulse * 0.5f * glowAlpha.value),
+                                    PrimaryTeal.copy(alpha = glowPulse * 0.3f),
                                     Color.Transparent
                                 )
                             ),
-                            shape = RoundedCornerShape(30.dp)
+                            shape = RoundedCornerShape(20.dp)
                         )
                 )
-                
-                // Main toast container with glass effect
-                Row(
+
+                // FIXED LAYOUT: Proper Card with weights/spacing
+                Card(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(30.dp))
-                        .background(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(
-                                    Color(0xFF0D1B2A).copy(alpha = 0.95f),
-                                    Color(0xFF1B263B).copy(alpha = 0.95f)
-                                )
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFF1A2A2A)
+                    ),
+                    border = BorderStroke(
+                        1.dp,
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                PrimaryTeal.copy(alpha = 0.6f),
+                                NeonCyan.copy(alpha = 0.6f),
+                                PrimaryTeal.copy(alpha = 0.6f)
                             )
                         )
-                        .border(
-                            width = 1.5.dp,
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(
-                                    PrimaryTeal.copy(alpha = 0.6f),
-                                    NeonCyan.copy(alpha = 0.6f),
-                                    PrimaryTeal.copy(alpha = 0.6f)
-                                )
-                            ),
-                            shape = RoundedCornerShape(30.dp)
-                        )
-                        .padding(horizontal = 20.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    // Animated check icon
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(
-                                brush = Brush.radialGradient(
-                                    colors = listOf(PrimaryTeal, NeonCyan.copy(alpha = 0.7f))
-                                )
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "âœ“",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.width(14.dp))
-                    
-                    // Message text
-                    Column {
-                        Text(
-                            text = message,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.5.sp
-                            ),
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Keep going! ðŸ’ª",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = PrimaryTeal.copy(alpha = 0.9f)
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.width(12.dp))
-                    
-                    // Sparkle effect
-                    Text(
-                        "âœ¨",
-                        fontSize = 24.sp,
-                        modifier = Modifier.graphicsLayer { scaleX = pulseScale; scaleY = pulseScale }
                     )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // FIXED: Unicode emoji instead of corrupted string
+                        Text(
+                            text = "\u2705", // ✅
+                            fontSize = 20.sp
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Task Done!",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Keep going! \uD83D\uDD25", // 🔥
+                                color = PrimaryTeal,
+                                fontSize = 12.sp
+                            )
+                        }
+                        // FIXED: Unicode emoji
+                        Text(
+                            text = "\uD83C\uDFAF", // 🎯
+                            fontSize = 20.sp
+                        )
+                    }
                 }
             }
         }
     }
 }
-

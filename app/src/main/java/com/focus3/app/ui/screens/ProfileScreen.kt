@@ -8,9 +8,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +15,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -33,11 +31,13 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.focus3.app.ui.components.GlassBox
 import com.focus3.app.ui.theme.*
 import kotlin.math.cos
@@ -57,13 +57,20 @@ fun ProfileScreen(
     userName: String,
     streak: Int,
     totalGoalsCompleted: Int,
+    googlePhotoUrl: String?,
+    googleDisplayName: String?,
+    googleEmail: String?,
     onAvatarChange: (String) -> Unit,
     onNameChange: (String) -> Unit,
     onBack: () -> Unit
 ) {
     var selectedAvatar by rememberSaveable(currentAvatar) { mutableStateOf(currentAvatar) }
-    var editedName by rememberSaveable(userName) { mutableStateOf(userName) }
-    var showAvatarPicker by remember { mutableStateOf(false) }
+    // Prefer Google display name over local userName
+    val effectiveUserName = remember(googleDisplayName, userName) {
+        if (!googleDisplayName.isNullOrBlank()) googleDisplayName else userName
+    }
+    var editedName by rememberSaveable(effectiveUserName) { mutableStateOf(effectiveUserName) }
+    val hasGooglePhoto = !googlePhotoUrl.isNullOrBlank()
     val haptic = LocalHapticFeedback.current
     val particleColors = remember {
         listOf(
@@ -361,41 +368,35 @@ fun ProfileScreen(
                                     )
                                 ),
                                 CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (hasGooglePhoto) {
+                            // Google profile photo loaded via Coil
+                            AsyncImage(
+                                model = googlePhotoUrl,
+                                contentDescription = "Profile Photo",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop
                             )
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) { 
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                showAvatarPicker = true 
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = selectedAvatar,
-                            fontSize = 70.sp
-                        )
-                    }
-                    
-                    // Edit badge
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .offset(x = (-10).dp, y = (-10).dp)
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(PrimaryTeal)
-                            .border(2.dp, DarkBackground, CircleShape)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) { 
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                showAvatarPicker = true 
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("✏️", fontSize = 18.sp)
+                        } else {
+                            // Fallback: emoji avatar or default icon
+                            if (selectedAvatar.isNotBlank()) {
+                                Text(
+                                    text = selectedAvatar,
+                                    fontSize = 70.sp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Default Avatar",
+                                    modifier = Modifier.size(70.dp),
+                                    tint = PrimaryTeal
+                                )
+                            }
+                        }
                     }
                 }
                 
@@ -500,6 +501,18 @@ fun ProfileScreen(
                                 innerTextField()
                             }
                         }
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Google email display
+                if (!googleEmail.isNullOrBlank()) {
+                    Text(
+                        text = googleEmail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextMuted,
+                        textAlign = TextAlign.Center
                     )
                 }
                 
@@ -679,23 +692,9 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(100.dp))
             }
         }
-        
-        // ═══════════════════════════════════════════════════════════════
-        // AVATAR PICKER DIALOG
-        // ═══════════════════════════════════════════════════════════════
-        if (showAvatarPicker) {
-            PremiumAvatarPickerDialog(
-                currentAvatar = selectedAvatar,
-                onSelect = { 
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    selectedAvatar = it
-                    showAvatarPicker = false
-                },
-                onDismiss = { showAvatarPicker = false }
-            )
-        }
     }
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PREMIUM COMPONENTS
@@ -758,94 +757,3 @@ private fun PremiumStatCard(
         }
     }
 }
-
-@Composable
-private fun PremiumAvatarPickerDialog(
-    currentAvatar: String,
-    onSelect: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val haptic = LocalHapticFeedback.current
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Color(0xFF12121A),
-        shape = RoundedCornerShape(28.dp),
-        title = {
-            Column {
-                Text(
-                    "CHOOSE AVATAR",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 1.5.sp
-                    ),
-                    color = PrimaryTeal
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "Select Your Identity",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Black
-                    ),
-                    color = Color.White
-                )
-            }
-        },
-        text = {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(6),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.height(200.dp)
-            ) {
-                items(
-                    items = avatarOptions,
-                    key = { it },
-                    contentType = { "avatar_option" }
-                ) { avatar ->
-                    val isSelected = avatar == currentAvatar
-                    Box(
-                        modifier = Modifier
-                            .aspectRatio(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (isSelected) 
-                                    PrimaryTeal.copy(alpha = 0.2f) 
-                                else 
-                                    Color.White.copy(alpha = 0.05f)
-                            )
-                            .then(
-                                if (isSelected) Modifier.border(
-                                    2.dp,
-                                    PrimaryTeal,
-                                    RoundedCornerShape(12.dp)
-                                ) else Modifier
-                            )
-                            .clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onSelect(avatar)
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = avatar,
-                            fontSize = 26.sp
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(
-                    "CLOSE",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = Color.White.copy(alpha = 0.4f)
-                )
-            }
-        }
-    )
-}
-

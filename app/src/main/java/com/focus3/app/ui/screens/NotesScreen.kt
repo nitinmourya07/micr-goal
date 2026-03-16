@@ -79,6 +79,7 @@ fun NotesScreen(
     // Memoize labels collection
     val allLabels = remember(notes) { notes.flatMap { it.getLabelsList() }.distinct().sorted() }
     val categoryCount = remember(notes) { notes.map { it.category }.distinct().size }
+    val checklistCount = remember(notes) { notes.count { it.checklistItems.isNotBlank() } }
     val hasAnyFilters = remember(showArchived, selectedLabel, searchQuery, selectedCategory) {
         showArchived || selectedLabel != null || searchQuery.isNotBlank() || selectedCategory != null
     }
@@ -137,21 +138,38 @@ fun NotesScreen(
                     
                     Column {
                         Text(
-                            "THOUGHT VAULT",
+                            "INTEL DATABASE",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 2.sp
                             ),
                             color = PrimaryTeal
                         )
-                        Text(
-                            "MEMORY BANK",
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = (-0.5).sp
-                            ),
-                            color = Color.White
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "Notes",
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = (-0.5).sp
+                                ),
+                                color = Color.White
+                            )
+                            if (notes.isNotEmpty()) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = PrimaryTeal.copy(alpha = 0.2f)
+                                ) {
+                                    Text(
+                                        "${notes.size}",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = PrimaryTeal,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                     }
                     
                     Spacer(modifier = Modifier.weight(1f))
@@ -388,26 +406,26 @@ fun NotesScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             QuickNoteStat(
-                                emoji = "📋",
+                                emoji = "\uD83D\uDCCB",
                                 label = "Total",
                                 value = notes.size.toString(),
                                 modifier = Modifier.weight(1f)
                             )
                             QuickNoteStat(
-                                emoji = "📌",
+                                emoji = "\uD83D\uDCCC",
                                 label = "Pinned",
                                 value = pinnedNotes.size.toString(),
                                 modifier = Modifier.weight(1f)
                             )
                             QuickNoteStat(
-                                emoji = "📂",
-                                label = "Categories",
-                                value = categoryCount.toString(),
+                                emoji = "\u2611\uFE0F",
+                                label = "Checklist",
+                                value = checklistCount.toString(),
                                 modifier = Modifier.weight(1f)
                             )
+                        }
                     }
                 }
-            }
             
             // Notes Grid
             if (notes.isEmpty()) {
@@ -469,7 +487,7 @@ fun NotesScreen(
                     Spacer(modifier = Modifier.height(28.dp))
                     
                     Text(
-                        "MIND PALACE",
+                        "NO MISSION LOGS",
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.Black,
                             letterSpacing = 3.sp
@@ -480,7 +498,7 @@ fun NotesScreen(
                     Spacer(modifier = Modifier.height(10.dp))
                     
                     Text(
-                        "Capture your elite ideas and structure\nyour thoughts. Your digital second brain.",
+                        "Your intel database is empty.\nBegin your first mission log.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.5f),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -583,7 +601,7 @@ fun NotesScreen(
                                 Text("✍️", fontSize = 20.sp)
                                 Spacer(Modifier.width(12.dp))
                                 Text(
-                                    "CREATE FIRST NOTE",
+                                    "INITIATE FIRST LOG",
                                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Black),
                                     color = Color.Black
                                 )
@@ -796,7 +814,12 @@ fun NotesScreen(
                     pressedElevation = 12.dp
                 )
             ) {
-                Text("✍️", fontSize = 24.sp)
+                Icon(
+                Icons.Default.Add,
+                contentDescription = "Add Note",
+                tint = Color.Black,
+                modifier = Modifier.size(28.dp)
+            )
             }
         }
     }
@@ -912,13 +935,25 @@ fun NoteCard(
     val hasChecklist = checklistItems.isNotEmpty()
     val labels = remember(note.labels) { note.getLabelsList() }
     
-    GlassBox(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        cornerRadius = 24.dp,
-        showGlow = note.isPinned
-    ) {
+    // Pinned note gets a teal left border accent
+    Row(modifier = Modifier.fillMaxWidth()) {
+        if (note.isPinned) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .clip(RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp))
+                    .background(PrimaryTeal)
+                    .align(Alignment.CenterVertically)
+                    .fillMaxHeight()
+            )
+        }
+        GlassBox(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(onClick = onClick),
+            cornerRadius = 24.dp,
+            showGlow = note.isPinned
+        ) {
         Column(modifier = Modifier.padding(20.dp)) {
             // Header: Emoji + Pin
             Row(
@@ -1114,6 +1149,7 @@ fun NoteCard(
                     Text("📌", fontSize = 14.sp)
                 }
             }
+        }
         }
     }
 }

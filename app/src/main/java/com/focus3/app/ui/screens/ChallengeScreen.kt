@@ -598,40 +598,22 @@ fun ChallengesStatsHeader(
         showGlow = true
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            // Header Row with Progress Ring
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        "⚡ MISSION HUB",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 1.5.sp
-                        ),
-                        color = PrimaryTeal
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "Track your journey",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.5f)
-                    )
-                }
-                
-                // Progress Ring
-                Box(
-                    modifier = Modifier.size(70.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    ProgressRing(
-                        progress = animatedProgress,
-                        size = 68.dp,
-                        strokeWidth = 6.dp
-                    )
-                }
+            // Header — title only, no progress ring
+            Column {
+                Text(
+                    "⚡ MISSION HUB",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.5.sp
+                    ),
+                    color = PrimaryTeal
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Track your journey",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.5f)
+                )
             }
             
             Spacer(modifier = Modifier.height(20.dp))
